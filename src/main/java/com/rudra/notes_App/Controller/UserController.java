@@ -15,10 +15,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 
 
 import java.beans.Encoder;
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 
 @RestController
@@ -62,7 +65,7 @@ public class UserController {
     }
 
 
-    @PostMapping("/{id}/notes")
+    @PostMapping("id/{id}/notes")
     public ResponseEntity<?> saveNoteOnUser(@PathVariable ObjectId id, @RequestBody NotesModel notes) {
 
 
@@ -71,14 +74,22 @@ public class UserController {
         return ResponseEntity.ok(savedNote);
 
     }
-    @GetMapping("/{username}/notes")
+    @PostMapping("/{username}/savenote")
+    public ResponseEntity<?> SaveNoteOnUser(@PathVariable String username, @RequestBody NotesModel notes){
+        NotesModel savenote = notesServices.savenote(notes);
+        userServices.addNoteByUsername(username,savenote);
+        return  ResponseEntity.ok(savenote);
+    }
+
+
+    @GetMapping("/{username}/notesFetch")
     public ResponseEntity<?> fetchUserNotes(@PathVariable String username) {
         try {
-            // get authenticated username
+
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String authenticatedUser = authentication.getName();
 
-           //check if the given authenticated username matched the username in path variable
+
             if (username.equals(authenticatedUser)) {
                 List<NotesModel> userNotes = userServices.getUserNotesByUserName(username);
                 if (userNotes == null || userNotes.isEmpty()) {
@@ -89,6 +100,98 @@ public class UserController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access denied.");
         } catch (Exception e) {
 
+            logger.error("Error fetching notes for user: " + username, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An error occurred while fetching notes.");
+        }
+    }
+    @PutMapping("/updateNote/{username}")
+    public ResponseEntity<?> updateNoteByUsername(
+            @PathVariable String username,
+            @RequestBody NotesModel noteDetails) {
+
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String authenticatedUser = authentication.getName();
+
+            if (!username.equals(authenticatedUser)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+            }
+
+            // Fetch user and their notes
+            UserModel user = userServices.getByUsername(username);
+            if (user == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("User not found");
+            }
+
+            // Find the specific note by ID in the user's notes
+            NotesModel existingNote = user.getNotes().stream()
+                    .filter(note -> note.getId().equals(noteDetails.getId()))
+                    .findFirst()
+                    .orElse(null);
+
+            if (existingNote == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Note not found");
+            }
+
+
+            existingNote.setTitle(noteDetails.getTitle());
+            existingNote.setContent(noteDetails.getContent());
+            existingNote.setCreatedAt(LocalDateTime.now());
+
+            notesServices.savenote(existingNote);
+
+            userServices.saveUser(user);
+
+            return ResponseEntity.ok("Note updated successfully");
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error updating note");
+        }
+    }
+    @DeleteMapping("deleteNote/{username}/{id}")
+    public ResponseEntity<?> deleteNoteByUsername(@PathVariable String username, @PathVariable ObjectId id) {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        String authenticatedUser = authentication.getName();
+
+        if (!username.equals(authenticatedUser)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("You are not authorized to delete this note.");
+        }
+
+        UserModel user = userServices.getUserByUsername(username)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        boolean removed = user.getNotes().removeIf(note -> note.getId().equals(id));
+
+        if (!removed) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Note not found.");
+        }
+
+        // Save the updated user (assuming notes are stored inside the user model)
+        userServices.saveUser(user);
+        notesServices.DeleteNote(id);
+
+        return ResponseEntity.ok("Note deleted successfully.");
+    }
+
+    @GetMapping("/{username}/NotesFetch")
+    public ResponseEntity<?> fetchusernotes(@PathVariable String username) {
+        try {
+            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            String authenticatedUser = authentication.getName();
+
+            if (!username.equals(authenticatedUser)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access denied.");
+            }
+
+            List<NotesModel> userNotes = userServices.getUserNotesByUserName(username);
+
+            if (userNotes == null || userNotes.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NO_CONTENT).body("No notes found for the user.");
+            }
+
+            // Return the list of notes (id will be a string due to @JsonGetter in NotesModel)
+            return ResponseEntity.ok(userNotes);
+        } catch (Exception e) {
             logger.error("Error fetching notes for user: " + username, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An error occurred while fetching notes.");
         }

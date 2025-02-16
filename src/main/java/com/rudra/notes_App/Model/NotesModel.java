@@ -1,5 +1,6 @@
 package com.rudra.notes_App.Model;
 
+import com.fasterxml.jackson.annotation.JsonGetter;
 import jakarta.annotation.Generated;
 import lombok.*;
 import org.bson.types.ObjectId;
@@ -26,5 +27,10 @@ public class NotesModel {
      private  String content;
 
      private LocalDateTime createdAt = LocalDateTime.now();
+     @JsonGetter("id")
+     public String getIdAsString() {
+          return id != null ? id.toHexString() : null;
+     }
+
 
 }

@@ -19,6 +19,7 @@ import java.util.Optional;
 @Slf4j
 public class UserServices {
 
+    public NotesModel getUserNotes;
     @Autowired
     private UserRepo userRepo;
 
@@ -33,7 +34,19 @@ public class UserServices {
         userRepo.save(user);
         return user;
     }
-    public UserModel findByUsername(String username) {
+
+    public NotesModel getNoteById(ObjectId noteId) {
+        return notesRepo.findById(noteId).orElse(null);
+    }
+
+    public void saveUser(UserModel user) {
+        userRepo.save(user);
+    }
+
+    public UserModel getByUsername(String username) {
+        return userRepo.findByUsername(username).orElse(null);
+    }
+    public Optional<UserModel> findByUsername(String username) {
         return userRepo.findByUsername(username
         );
     }
@@ -42,12 +55,12 @@ public class UserServices {
         return userRepo.findById(id);
     }
 
-    public UserModel getUserByUsername(String username) {
+    public Optional<UserModel> getUserByUsername(String username) {
         return userRepo.findByUsername(username);
     }
 
     public Optional<UserModel> getUserByEmail(String email) {
-        return userRepo.findByMail(email);
+        return userRepo.findByEmail(email);
     }
 
     public List<UserModel> getAllUsers() {
@@ -73,6 +86,15 @@ public class UserServices {
         });
     }
 
+    public void addNoteByUsername(String username, NotesModel note) {
+        getUserByUsername(username).ifPresent(user -> {
+            user.getNotes().add(note); // Assuming `User` has a `List<NotesModel> notes`
+
+            userRepo.save(user); // Save the updated user
+            notesRepo.save(note); // Save the new note
+        });
+    }
+
 
 
     public List<NotesModel> getUserNotes(ObjectId id) {
@@ -81,15 +103,9 @@ public class UserServices {
         return user.getNotes();
     }
     public List<NotesModel> getUserNotesByUserName(String username) {
-
-        UserModel user = userRepo.findByUsername(username);
-
-
-        if (user != null) {
-            return user.getNotes();
-        } else {
-            throw new UserNotFound("User not found");
-        }
+        return userRepo.findByUsername(username)
+                .map(UserModel::getNotes)
+                .orElseThrow(() -> new UserNotFound("User not found"));
     }
 
 
@@ -106,6 +122,6 @@ public class UserServices {
     }
 
     public boolean isEmailAvailable(String email) {
-        return !userRepo.existsByMail(email);
+        return !userRepo.existsByEmail(email);
     }
 }

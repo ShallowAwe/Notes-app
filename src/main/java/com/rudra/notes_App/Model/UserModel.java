@@ -27,7 +27,7 @@ public class UserModel {
     private String username;
 
     @Indexed(unique = true)
-    private String mail;
+    private String email;
 
 
     private String password;

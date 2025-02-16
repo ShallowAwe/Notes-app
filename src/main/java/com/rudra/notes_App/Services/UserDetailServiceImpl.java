@@ -21,17 +21,15 @@ public class UserDetailServiceImpl implements UserDetailsService {
         this.userRepo = userRepo;
     }
 
+
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        UserModel user = userRepo.findByUsername(username);
-        if (user == null) {
-            throw new UsernameNotFoundException("User not found: " + username);
-        }
-
-        return User.builder()
-                .username(user.getUsername())
-                .password(user.getPassword())
-                .roles("USER")
-                .build();
+        return userRepo.findByUsername(username)
+                .map(user -> User.builder()
+                        .username(user.getUsername())
+                        .password(user.getPassword())
+                        .roles("USER")
+                        .build())
+                .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
     }
 }

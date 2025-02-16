@@ -40,5 +40,8 @@ public class NotesServices {
 
     }
 
+    public void DeleteNote(ObjectId id ){
+      notesRepo.deleteById(id);
+    }
+    }
 
-}
